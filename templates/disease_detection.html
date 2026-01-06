@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ lang.disease_detection }}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+  <div class="fixed top-0 left-0 h-full w-60 bg-green-700 text-white shadow-xl">
+    <div class="p-5 text-2xl font-bold border-b border-green-500">{{ lang.app_title }}</div>
+    <nav class="mt-4">
+      <a href="/dashboard.html?lang={{ current_lang }}" class="block p-4 hover:bg-green-600">📊 {{ lang.dashboard }}</a>
+      <a href="/crop_recommendation.html?lang={{ current_lang }}" class="block p-4 hover:bg-green-600">🌱 {{ lang.crop_recommendation }}</a>
+      <a href="/disease_detection.html?lang={{ current_lang }}" class="block p-4 bg-green-600">🦠 {{ lang.disease_detection }}</a>
+      <a href="/fertilizer_advisory.html?lang={{ current_lang }}" class="block p-4 hover:bg-green-600">🧪 {{ lang.fertilizer_advisory }}</a>
+      <a href="/ai_interactive.html?lang={{ current_lang }}" class="block p-4 hover:bg-green-600">🤖 {{ lang.ai_chatbot }}</a>
+      <a href="/weather.html?lang={{ current_lang }}" class="block p-4 hover:bg-green-600">☁ {{ lang.weather }}</a>
+       <div class="p-4 mt-3">
+        <label class="block mb-2 font-semibold">🌐 {{ lang.language }}</label>
+        <select id="lang" class="p-2 w-full text-black rounded">
+          <option value="en">English</option>
+          <option value="hi">Hindi</option>
+          <option value="te">Telugu</option>
+        </select>
+      </div>
+    </nav>
+     <div class="absolute bottom-4 w-full text-center text-sm p-2">
+      <p>Developed_by <b>vss</b><br>© 2025</p>
+    </div>
+  </div>
+
+  <main class="ml-60 p-8">
+    <h1 class="text-3xl font-bold mb-4">{{ lang.disease_detection }}</h1>
+
+    <div class="max-w-2xl">
+      <div class="bg-white p-6 rounded shadow">
+        <label class="block font-semibold">{{ lang.upload_label }}</label>
+        <input id="imageInput" type="file" accept="image/*" class="mt-2 mb-4" />
+        
+        <div id="previewContainer" class="hidden mb-4">
+            <p class="text-sm text-gray-500 mb-1">Selected Image:</p>
+            <img id="preview" src="" alt="Leaf Preview" class="max-h-64 rounded border border-gray-300 shadow-sm" />
+        </div>
+
+        <button id="sendBtn" class="bg-red-600 text-white p-2 rounded w-full md:w-auto">{{ lang.detect_btn }}</button>
+      </div>
+
+      <div id="response" class="mt-6"></div>
+    </div>
+  </main>
+
+  <script>
+    const CURRENT_LANGUAGE = '{{ current_lang }}';
+    const langQueryParam = `?lang=${CURRENT_LANGUAGE}`;
+
+    // Language Switcher
+    const langSelect = document.getElementById('lang');
+    if (langSelect) {
+      langSelect.value = CURRENT_LANGUAGE;
+      langSelect.addEventListener('change', (e) => {
+        const newLang = e.target.value;
+        window.location.search = `?lang=${newLang}`;
+      });
+    }
+
+    // --- NEW: Image Preview Logic ---
+    const imageInput = document.getElementById('imageInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const previewImage = document.getElementById('preview');
+
+    imageInput.addEventListener('change', function() {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewImage.src = e.target.result;
+          previewContainer.classList.remove('hidden'); // Show the preview
+        }
+        reader.readAsDataURL(file);
+      } else {
+        previewContainer.classList.add('hidden'); // Hide if no file
+        previewImage.src = "";
+      }
+    });
+    // --------------------------------
+
+    function formatAIResponse(text) {
+      if (!text) return "";
+      let formattedText = text;
+      formattedText = formattedText.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+      formattedText = formattedText.replace(/^\s*(\d+\.|-)\s+/gm, '<br/>&nbsp;&nbsp;•&nbsp;&nbsp;');
+      formattedText = formattedText.replace(/\n/g, '<br/>');
+      if (formattedText.startsWith('<br/>')) {
+        formattedText = formattedText.substring(5);
+      }
+      return formattedText;
+    }
+
+    document.getElementById('sendBtn').addEventListener('click', async () => {
+      const f = document.getElementById('imageInput').files[0];
+      if (!f) { alert('Please choose an image'); return; }
+      const fd = new FormData();
+      fd.append('image', f);
+      
+      const responseDiv = document.getElementById('response');
+      responseDiv.innerHTML = "<div class='p-4 bg-white rounded shadow'>Analyzing... please wait</div>";
+      
+      try {
+        const res = await fetch(`/api/predict_disease${langQueryParam}`, { method: 'POST', body: fd });
+        const json = await res.json();
+        
+        if (json.error) {
+          responseDiv.innerHTML = "<div class='p-4 bg-red-100 rounded'>Error: " + json.error + "</div>";
+          return;
+        }
+        
+        let html = `<div class='p-4 bg-white rounded shadow'><h3 class='font-bold'>{{ lang.disease_result }}: ${json.label}</h3>`;
+        html += `<p>{{ lang.confidence_result }}: ${(json.confidence*100).toFixed(1)}%</p>`;
+        
+        if (json.label_key !== 'Healthy') {
+           html += `<hr class='my-2'/>`;
+           html += `<button id='fertBtn' data-disease='${json.label_key}' class='mt-3 bg-yellow-600 text-white p-2 rounded'>{{ lang.get_fertilizer_btn }}</button></div>`;
+        } else {
+           html += `<p class='mt-2 text-green-700 font-bold'>{{ lang.healthy_result }}</p></div>`;
+        }
+        responseDiv.innerHTML = html;
+        
+        const fertBtn = document.getElementById('fertBtn');
+        if (fertBtn) {
+          fertBtn.addEventListener('click', async (e) => {
+            const disease_key = e.target.dataset.disease; 
+            fertBtn.textContent = 'Getting advice...';
+            fertBtn.disabled = true;
+            
+            const body = { crop: 'Unknown', disease: disease_key, soil_type: 'Loamy' };
+            const r2 = await fetch(`/api/fertilizer_advice${langQueryParam}`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+            const j2 = await r2.json();
+            
+            if(j2.recommendation) {
+                const formattedAdvice = formatAIResponse(j2.recommendation);
+                responseDiv.innerHTML += `<div class='mt-3 p-3 bg-gray-50 rounded'>${formattedAdvice}</div>`;
+            } else {
+                responseDiv.innerHTML += `<div class='mt-3 p-3 bg-red-100 rounded'>Error: ${j2.error || 'Failed to get advice'}</div>`;
+            }
+            fertBtn.remove();
+          });
+        }
+      } catch (err) {
+        responseDiv.innerHTML = "<div class='p-4 bg-red-100 rounded'>Network or server error</div>";
+      }
+    });
+  </script>
+</body>
+</html>

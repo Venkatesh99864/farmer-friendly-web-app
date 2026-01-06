@@ -1,0 +1,31 @@
+# MLflow (MUST ignore - hundreds of MBs)
+mlruns/
+mlruns.db
+mlartifacts/
+
+# Downloaded models (cloud loaded)
+models/
+*.pkl
+*.keras
+*.h5
+
+# Secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+env/
+venv/
+.venv/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs/Jupyter
+*.log
+logs/
+*.ipynb
